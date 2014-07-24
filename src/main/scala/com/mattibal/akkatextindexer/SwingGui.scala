@@ -4,7 +4,7 @@ import java.awt.event.{ActionEvent, ActionListener, WindowEvent, WindowListener}
 import javax.swing._
 
 import akka.actor.{Props, Actor}
-import com.mattibal.akkatextindexer.TextSearcherNode.{SearchWord, StartIndexing}
+import com.mattibal.akkatextindexer.TextSearcherNode._
 import java.io.File
 
 
@@ -18,6 +18,7 @@ class SwingGuiActor extends Actor {
   var dirsScanned: Long = 0
   var filesIndexed: Long = 0
   var wordsInIndex: Long = 0
+
 
   /**
    * Initialize the Swing GUI when the actor is started
@@ -37,6 +38,9 @@ class SwingGuiActor extends Actor {
         val searchTextField = new JTextField
         val searchResultScrollPane = new JScrollPane
 
+        // This var should be accessed only by the swing event dispatcher thread
+        var isPaused = false
+
         frame.setTitle("Akka Text Indexer")
         stopButton.setText("Stop")
         searchWordLabel.setText("Search word:")
@@ -47,6 +51,8 @@ class SwingGuiActor extends Actor {
         browseButton.setText("Browse...")
         startButton.setText("Start")
         pauseButton.setText("Pause")
+        pauseButton.setEnabled(false)
+        stopButton.setEnabled(false)
 
 
         browseButton.addActionListener(new ActionListener(){
@@ -64,7 +70,33 @@ class SwingGuiActor extends Actor {
         startButton.addActionListener(new ActionListener {
           override def actionPerformed(e: ActionEvent): Unit = {
             startButton.setEnabled(false)
+            pauseButton.setEnabled(true)
+            stopButton.setEnabled(true)
             context.parent ! StartIndexing(new File(dirPathTextField.getText))
+          }
+        })
+
+        pauseButton.addActionListener(new ActionListener {
+          override def actionPerformed(e: ActionEvent): Unit = {
+            if(!isPaused){
+              pauseButton.setText("Resume")
+              context.parent ! PauseIndexing
+              isPaused = true
+              stopButton.setEnabled(false)
+            } else {
+              pauseButton.setText("Pause")
+              context.parent ! ResumeIndexing
+              isPaused = false
+              stopButton.setEnabled(true)
+            }
+          }
+        })
+
+        stopButton.addActionListener(new ActionListener {
+          override def actionPerformed(e: ActionEvent): Unit = {
+            pauseButton.setEnabled(false)
+            startButton.setEnabled(true)
+            context.parent ! StopIndexing
           }
         })
 

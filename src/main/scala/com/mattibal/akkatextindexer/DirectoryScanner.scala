@@ -4,7 +4,8 @@ import java.io.{FileFilter, File}
 
 import akka.actor._
 import akka.routing.{RandomRoutingLogic, Router, ActorRefRoutee}
-import com.mattibal.akkatextindexer.DirectoryScanner.{ScanDirectory, FileHasBeenIndexed, SendStatusUpdate}
+import com.mattibal.akkatextindexer.DirectoryScanner._
+import com.mattibal.akkatextindexer.TextSearcherNode.{IndexingPausingControl, ResumeIndexing, PauseIndexing}
 import scala.concurrent.duration._
 
 
@@ -66,6 +67,10 @@ class DirectoryScannerMaster(indexMaster: ActorRef) extends Actor {
       indexedFiles += 1
       scheduleStatusUpdateIfNecessary
     }
+
+    case msg: IndexingPausingControl => {
+      for(child <- router.routees) child.send(msg, self)
+    }
   }
 
   /**
@@ -90,7 +95,7 @@ class DirectoryScannerMaster(indexMaster: ActorRef) extends Actor {
  * For every directory contained, it tell to the master (that will reroute to one of this child actors) to scan that directory.
  * For every regular file it checks if the extension is .txt, and in that case it........
  */
-class DirectoryScannerWorker(indexMaster: ActorRef) extends Actor {
+class DirectoryScannerWorker(indexMaster: ActorRef) extends Actor with Stash {
 
   def receive = {
 
@@ -118,6 +123,16 @@ class DirectoryScannerWorker(indexMaster: ActorRef) extends Actor {
       // A text file scanning has finished (successfully or unsuccessfully...)
       context.parent ! FileHasBeenIndexed
     }
+
+    case PauseIndexing => {
+      context.become({
+        case ResumeIndexing => {
+          unstashAll()
+          context.unbecome()
+        }
+        case _ => stash()
+      }, discardOld = false)
+    }
   }
 
 }
@@ -139,6 +154,7 @@ object DirectoryScanner {
   case object SendStatusUpdate
 
   case object FileHasBeenIndexed
+
 
 }
 

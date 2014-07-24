@@ -4,8 +4,7 @@ import java.io.File
 
 import akka.actor._
 import com.mattibal.akkatextindexer.TextSearcherNode._
-
-import scala.collection.concurrent.TrieMap
+import scala.concurrent.duration._
 
 
 /**
@@ -28,19 +27,36 @@ class TextSearcherNode extends Actor {
   var directoryScanner : ActorRef = null
   var currIndex : ActorRef = null
 
+  var reindexerScheduler: Option[Cancellable] = None
+
   override def preStart(): Unit = {
     // Create some initial actors
     guiActor = context.actorOf(Props[SwingGuiActor], "swingGuiActor")
-    currIndex = context.actorOf(Props(new WordIndexMaster()))
+    createIndexActor()
+  }
+
+  def createScannerActor() {
     directoryScanner = context.actorOf(Props(new DirectoryScannerMaster(currIndex)))
   }
 
+  def createIndexActor() {
+    currIndex = context.actorOf(Props(new WordIndexMaster()))
+  }
+
+
   def receive = {
-      case StartIndexing(directory) =>
-        println("starting indexing")
-        currIndex = context.actorOf(Props(new WordIndexMaster())) // throw away the old index and create a new one
-        directoryScanner = context.actorOf(Props(new DirectoryScannerMaster(currIndex)))
+
+      case StartIndexing(directory) => {
+        context.stop(currIndex)
+        createIndexActor()
+        createScannerActor()
         directoryScanner ! DirectoryScanner.ScanDirectory(directory)
+
+        // Schedule a reindexing every a certain time interval
+        import context.dispatcher
+        reindexerScheduler = Some(context.system.scheduler.scheduleOnce(5 minutes, self, StartIndexing(directory)))
+      }
+
       case msg: SearchWord =>
         currIndex ! msg
       case msg: FilesContainingWord =>
@@ -49,6 +65,13 @@ class TextSearcherNode extends Actor {
         guiActor ! msg
       case msg: NumWordsInIndex =>
         guiActor ! msg
+      case msg : IndexingPausingControl =>
+        directoryScanner ! msg
+
+      case StopIndexing => {
+        context.stop(directoryScanner)
+        reindexerScheduler.foreach(_.cancel())
+      }
   }
 
 }
@@ -62,7 +85,6 @@ object TextSearcherNode {
    * Send this message to the TextSearcherNode actor to start indexing the specified directory or subdirectory
    */
   case class StartIndexing(directory: File)
-  case object PauseIndexing
   case object StopIndexing
   case object IndexingCompleted
 
@@ -71,4 +93,8 @@ object TextSearcherNode {
 
   case class ScanningStatusUpdate(numDirectoriesScanned: Long, numFilesIndexed: Long)
   case class NumWordsInIndex(numWords: Long)
+
+  trait IndexingPausingControl
+  case object PauseIndexing extends IndexingPausingControl
+  case object ResumeIndexing extends IndexingPausingControl
 }
