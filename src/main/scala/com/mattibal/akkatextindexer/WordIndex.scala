@@ -40,7 +40,7 @@ class WordIndexMaster extends Actor {
       router.route(msg, sender())
       if (!statusUpdateScheduled) {
         import context.dispatcher
-        context.system.scheduler.scheduleOnce(100 milliseconds, self, SendNumWordsInIndex)
+        context.system.scheduler.scheduleOnce(10 milliseconds, self, SendNumWordsInIndex)
         statusUpdateScheduled = true
       }
     }

@@ -23,7 +23,7 @@ class FileIndexer(file : File, indexMaster : ActorRef) extends Actor {
     val path = java.nio.file.Paths.get(file.getAbsolutePath)
 
     // start the FileSlurp actor. It will send to myself chunks of the file of max 256 bytes
-    context.actorOf(Props(classOf[FileSlurp], path, self, 256))
+    context.actorOf(Props(classOf[FileSlurp], path, self, 204800))
 
   }
 
