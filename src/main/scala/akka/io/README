@@ -1,0 +1,3 @@
+The code on this package has been taken from this example project: https://github.com/drexin/akka-io-file
+
+It's an addition to the Akka IO library to perform asynchronous non-blocking IO also with files.
