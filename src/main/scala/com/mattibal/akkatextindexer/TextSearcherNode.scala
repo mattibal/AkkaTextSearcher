@@ -32,7 +32,7 @@ class TextSearcherNode extends Actor {
     // Create some initial actors
     guiActor = context.actorOf(Props[SwingGuiActor], "swingGuiActor")
     currIndex = context.actorOf(Props(new WordIndexMaster()))
-    directoryScanner = context.actorOf(Props(new DirectoryScannerMaster(currIndex)))
+    directoryScanner = context.actorOf(Props(new DirectoryScannerMaster(currIndex)).withDispatcher("indexing-dispatcher"))
   }
 
   def receive = {

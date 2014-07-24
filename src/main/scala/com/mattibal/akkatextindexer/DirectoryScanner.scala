@@ -18,7 +18,7 @@ class DirectoryScannerMaster(indexMaster: ActorRef) extends Actor {
 
   var router = {
     val routees = Vector.fill(8){
-      val routee = context.actorOf(Props(new DirectoryScannerWorker(indexMaster)))
+      val routee = context.actorOf(Props(new DirectoryScannerWorker(indexMaster)).withDispatcher("indexing-dispatcher"))
       context.watch(routee) // watch if the child worker actor terminates
       ActorRefRoutee(routee)
     }
@@ -53,7 +53,7 @@ class DirectoryScannerMaster(indexMaster: ActorRef) extends Actor {
 
     case Terminated(terminatedActor) => // Handle a worker actor termination (caused for example by an exception)
       router = router.removeRoutee(terminatedActor)
-      val newActor = context.actorOf(Props(new DirectoryScannerWorker(indexMaster)))
+      val newActor = context.actorOf(Props(new DirectoryScannerWorker(indexMaster)).withDispatcher("indexing-dispatcher"))
       context.watch(newActor)
       router = router.addRoutee(newActor)
 
@@ -108,7 +108,7 @@ class DirectoryScannerWorker(indexMaster: ActorRef) extends Actor {
         if(file.isDirectory) {
           context.parent ! DirectoryScanner.ScanDirectory(file)
         } else {
-          val fileIndexer = context.actorOf(Props(new FileIndexer(file, indexMaster))) // this will start indexing the file
+          val fileIndexer = context.actorOf(Props(new FileIndexer(file, indexMaster)).withDispatcher("indexing-dispatcher")) // this will start indexing the file
           context.watch(fileIndexer) // be notified when the file indexer actor terminates
         }
       }
